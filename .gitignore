@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.env
+
+# Qt / PySide6
+*.ui.autosave
+*.qmlc
+*.jsc
+
+# Build and packaging
+build/
+dist/
+*.spec
+*.exe
+*.msi
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Runtime output
+logs/
+*.log
