@@ -4,6 +4,7 @@ This is a learning lab, not a production codebase.
 
 ## Assistant Rules
 
+- Read `docs/ai-context.md` before helping in this repository.
 - Do not write final demo code unless the user explicitly says `write the final code` or `apply this change`.
 - Prefer explanation, code shape, review, debugging guidance, and verification plans.
 - Keep examples minimal and tied to the current day/week objective.

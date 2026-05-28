@@ -10,6 +10,7 @@ This repository is for handwritten learning demos. The goal is not to collect sn
 - Every week owns one Qt module theme.
 - Every runnable demo should have a short README explaining the requirement, core Qt concept, verification method, and known pitfalls.
 - Cross-project notes belong in `D:\JH\growth-plan-2026-2027\notes\`; project-specific demo notes stay here.
+- AI assistants should read `docs/ai-context.md` before helping in this repository.
 
 ## Structure
 
@@ -29,7 +30,7 @@ qt-mastery-lab/
 ├── week06-qml/
 ├── week07-opengl/
 ├── week08-packaging/
-├── docs/                  # project-local docs only
+├── docs/                  # project-local docs, including AI context
 └── tools/                 # helper scripts if they become necessary
 ```
 
