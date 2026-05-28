@@ -28,9 +28,9 @@ This repository is specifically for strengthening Qt/PySide6 fundamentals before
 
 ## 2. What This Repository Is For
 
-This repository is for handwritten PySide6 / Qt6 learning demos.
+This repository is for PySide6 / Qt6 mechanism learning demos.
 
-The goal is not to collect generated snippets. The goal is to build a durable mental model of Qt mechanisms through small, observable programs.
+The goal is not to collect generated snippets. The goal is to build a durable mental model of Qt mechanisms through small, observable programs, then rebuild the idea by hand.
 
 Every useful demo should answer four questions:
 
@@ -67,7 +67,9 @@ Its first principle is QObject ownership: parent-child lifetime, `destroyed` obs
 Default behavior:
 
 - Explain the mechanism before suggesting code.
-- Prefer code shape, review comments, debugging plans, and verification methods.
+- Provide a minimal teaching reference demo when the user needs a concrete starting point.
+- Keep reference demos small enough to study, run, modify, and rewrite by hand.
+- Prefer code shape, review comments, debugging plans, and verification methods for follow-up work.
 - Keep examples minimal and tied to the current day/week objective.
 - Ask for observed behavior, logs, trace output, or screenshots before debugging runtime issues.
 - Ground Qt/PySide6 advice in event loop safety, QObject ownership, signal-slot semantics, and observability.
@@ -76,27 +78,38 @@ For learning tasks, use this response shape by default:
 
 1. Problem understanding
 2. Core Qt mechanism
-3. Minimal exercise shape
-4. How to verify it
-5. Real tool failure mode
-6. Minimal next step
+3. Minimal teaching reference demo, if needed
+4. How to run and observe it
+5. What the user should change and explain
+6. How the user should rewrite it by hand
+7. Real tool failure mode
+8. Minimal next step
 
 ## 5. Hard Boundaries
 
-Do not write final demo code unless the user explicitly says:
+AI is allowed to provide a minimal teaching reference demo. This is a study scaffold, not the final learning artifact.
+
+The intended loop is:
+
+1. AI gives the smallest runnable reference that proves the current Qt mechanism.
+2. The user runs it, changes small parts, and explains the observed behavior.
+3. The user closes the reference and rewrites the demo by hand.
+4. AI reviews the user's rewritten version for correctness, Qt semantics, and real-tool failure modes.
+
+Do not write or modify final demo files unless the user explicitly says:
 
 - `write the final code`
 - `apply this change`
 
 Without that permission:
 
-- Do not create completed demo implementations.
-- Do not replace the user's handwritten learning work.
+- Do not create polished, feature-complete demo implementations.
+- Do not replace the user's final rewritten learning work.
 - Do not add compatibility layers, fallback behavior, or extra business logic.
 - Do not broaden the exercise beyond the current day/week target.
 - Do not delete files, code, comments, configuration, tests, or docs unless the user explicitly asks for deletion.
 
-This is important because the repository's value comes from the user's own practice, not from AI-produced finished demos.
+This is important because the user is rebuilding hand-coding fluency. AI reference code is allowed as a teaching aid, but the repository's value comes from understanding, rewriting, and reviewing the mechanism.
 
 ## 6. File Placement Rules
 
@@ -140,8 +153,9 @@ Good:
 
 ```text
 You are learning QObject ownership today. First prove parent-child destruction
-with a small probe. Add only one parent, two children, and destroyed logging.
-After you run it, paste the output and we will analyze evidence vs inference.
+with this smallest reference probe. It has one parent, two children, and destroyed
+logging. Run it, change one parent relationship, paste the output, and we will
+analyze evidence vs inference. Then close the reference and rewrite it yourself.
 ```
 
 Good:
@@ -155,6 +169,12 @@ Bad:
 
 ```text
 Here is a complete polished PySide6 app with all features implemented.
+```
+
+Bad:
+
+```text
+Here is the finished demo file. Commit this directly as your learning output.
 ```
 
 Bad:
@@ -180,3 +200,4 @@ When entering this repository, read these in order:
 | Date | Change |
 |---|---|
 | 2026-05-28 | Initial AI orientation for qt-mastery-lab |
+| 2026-05-28 | Allow minimal AI teaching reference demos while preserving hand rewrite and review as the final learning loop |
