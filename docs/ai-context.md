@@ -64,6 +64,8 @@ Phase 1 uses an 8-week synchronized Qt6 C++ + PySide6 structure:
 | W7 | OpenGL / high-performance rendering | C++ Qt OpenGL lifecycle + PySide6 high-volume plotting prototype |
 | W8 | Packaging | PySide6 packaging plus Qt/C++ runtime, plugin, DLL, ABI notes |
 
+`showcase/` is a separate integration and portfolio area. It is for composing already-practiced Qt mechanisms into public-facing projects. The current seed is `showcase/studio-shell/`, an extensible Qt engineering-tool shell. It should remain design-only until enough W1-W5 fundamentals have been practiced to explain the architecture from first principles.
+
 `basic_study/` is a separate warmup and ad-hoc practice area. It is for 2026-05-28 to 2026-05-31 pre-study practice and for later foundation drills when the user wants to rebuild hand-coding fluency. It does not count as official Phase 1 weekly output unless the user rewrites/promotes the work into a matching `weekXX-*` directory.
 
 Day 01 starts at:
@@ -141,6 +143,7 @@ Short version:
 |---|---|
 | Pre-2026-06-01 warmup and ad-hoc basics | `D:\gitdir\qt-mastery-lab\basic_study\` |
 | Learning demo code for both tracks | `D:\gitdir\qt-mastery-lab\weekXX-...\` |
+| Integration / portfolio projects | `D:\gitdir\qt-mastery-lab\showcase\` |
 | Project-specific demo notes | this repository, near the demo |
 | Cross-project Qt/C++/engineering notes | `D:\JH\growth-plan-2026-2027\notes\` |
 | Weekly/monthly progress records | `D:\JH\growth-plan-2026-2027\progress\` |

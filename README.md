@@ -34,9 +34,22 @@ qt-mastery-lab/
 ├── week06-qml/
 ├── week07-opengl/
 ├── week08-packaging/
+├── showcase/              # Phase 1 integration projects for public portfolio display
 ├── docs/                  # project-local docs, including AI context
 └── tools/                 # helper scripts if they become necessary
 ```
+
+## Showcase Track
+
+`showcase/` is for integration projects that turn weekly Qt fundamentals into public, portfolio-ready applications.
+
+Current seed:
+
+| Project | Role | Start Condition |
+|---|---|---|
+| `showcase/studio-shell/` | extensible Qt engineering-tool shell | design now, implementation after enough W1-W5 mechanisms are practiced |
+
+The weekly folders remain the primary learning track. Showcase projects should compose practiced mechanisms instead of replacing the weekly exercises.
 
 ## Phase 1 Weekly Map
 
@@ -50,4 +63,3 @@ qt-mastery-lab/
 | W6 | QML / Qt Quick | C++ registration/property model + PySide6/Python backend QML demo |
 | W7 | OpenGL / high-performance rendering | C++ Qt OpenGL lifecycle + PySide6 high-volume plotting prototype |
 | W8 | Packaging | PySide6 packaging plus Qt/C++ runtime, plugin, DLL, ABI notes |
-
