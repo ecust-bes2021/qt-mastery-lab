@@ -64,10 +64,22 @@ class SerialReader(QObject):
         self._interval = 0.5
     
     def start_reading(self):
+        with QMutexLocker(self._mutex):
+            self._running = True
         self.connected.emit()
-        while self._running:
+        while True:
+            with QMutexLocker(self._mutex):
+                if not self._running:
+                    break
             
-            self.data_received.emit()
+            data = {
+                "timestamp": time.time(),
+                "temp": round(random.uniform(20,35),1),
+                "humidity":round(random.uniform(40,80),1),
+                "pressure":round(random.uniform(99,103),2)
+            }
+            
+            self.data_received.emit(data)
             time.sleep(self._interval)
         self.disconnected.emit()
     
@@ -102,9 +114,25 @@ class SerialMonitorDemo(QWidget):
         self._tableWidget.setEditTriggers(QTableWidget.NoEditTriggers)
         self._textEdit = QTextEdit()
         self._textEdit.setReadOnly(True)
+        self._btn_connect = QPushButton("连接")
+        self._btn_disconnect = QPushButton("断开")
+        self._btn_clear =  QPushButton("清空数据")
+        self._btn_connect.clicked.connect(self._connect_serial)
+        self._btn_disconnect.clicked.connect(self._disconnect_serial)
+        self._btn_clear.clicked.connect(self._clear_data)
 
         # TODO(3): 布局
-        ???
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self._btn_connect)
+        hlayout.addWidget(self._btn_disconnect)
+        hlayout.addWidget(self._btn_clear)
+        layout = QVBoxLayout()
+        layout.addLayout(hlayout)
+        layout.addWidget(self._label)
+        layout.addWidget(self._tableWidget)
+        layout.addWidget(self._textEdit)
+        self.setLayout(layout)
+        
 
         # TODO(4): 创建线程和 SerialReader
         #   创建 QThread 和 SerialReader
@@ -116,7 +144,16 @@ class SerialMonitorDemo(QWidget):
         #     _reader.disconnected → self._on_disconnected
         #     _reader.disconnected → _thread.quit
         #     _reader.error → self._on_error
-        ???
+        self._thread = QThread()
+        self._reader = SerialReader()
+        self._reader.moveToThread(self._thread)
+        self._reader.data_received.connect(self._on_data_received)
+        self._reader.connected.connect(self._on_connected)
+        self._reader.disconnected.connect(self._disconnect_serial)
+        self._reader.disconnected.connect(self._thread.quit)
+        self._reader.error.connect(self._on_error)
+
+        self._thread.started.connect(self._reader.start_reading)
 
         # TODO(5): 创建一个 QTimer 用于限制 UI 刷新频率（可选）
         #   如果数据来得太快，每条都刷新 UI 会卡
@@ -128,14 +165,23 @@ class SerialMonitorDemo(QWidget):
         #
         #   思考：为什么高频数据不能每条都直接更新 UI？
         #         QTimer 在哪个线程运行？
-        ???
+        self._refresh_timer = QTimer()
+        self._refresh_timer.timeout.connect(self._flush_buffer)
+        self._refresh_timer.start(200)
+
+        self._data_buffer = []
+        
 
     def _connect_serial(self):
         # TODO(6): 连接（启动线程）
         #   检查线程是否已运行
         #   启动线程
         #   更新按钮状态
-        ???
+        if not self._thread.isRunning():
+            self._thread.start()
+            self._btn_connect.setEnabled(False)
+            self._btn_disconnect.setEnabled(True)
+            self._label.setText("已连接")
 
     def _disconnect_serial(self):
         # TODO(7): 断开（停止读取）
@@ -143,7 +189,10 @@ class SerialMonitorDemo(QWidget):
         #   注意：不要直接 _thread.quit()，等 Worker 循环自己退出后触发 disconnected → quit
         #
         #   思考：为什么不能直接 terminate() 线程？
-        ???
+        if self._thread.isRunning():
+            self._reader.stop_reading()
+            self._btn_disconnect.setEnabled(False)
+            self._btn_connect.setEnabled(True)
 
     def _on_data_received(self, data):
         # TODO(8): 收到数据
@@ -156,38 +205,65 @@ class SerialMonitorDemo(QWidget):
         #     self._table.insertRow(row)
         #     self._table.setItem(row, 0, QTableWidgetItem(str(data["timestamp"])))
         #     ...
-        ???
+        self._data_buffer.append(data)
+
 
     def _on_connected(self):
         # TODO(9): 连接成功回调
         #   更新状态标签
         #   追加日志
-        ???
+        self._label.setText("连接成功")
+        self._textEdit.append("连接成功")
+        
 
     def _on_disconnected(self):
         # TODO(10): 断开连接回调
         #   更新状态标签
         #   追加日志
         #   恢复按钮状态
-        ???
+        self._btn_connect.setEnabled(True)
+        self._btn_disconnect.setEnabled(False)
+        self._label.setText("已断开连接")
+        self._textEdit.append("断开连接")
+        
 
     def _on_error(self, msg):
         # TODO(11): 错误处理
         #   追加日志
         #   可选：自动断开
-        ???
+        self._textEdit.append("Error: 出现错误！")
 
     def _clear_data(self):
         # TODO(12): 清空表格数据
         #   清空 QTableWidget：setRowCount(0)
-        ???
+        self._tableWidget.setRowCount(0)
+        self._textEdit.append("清空数据")
 
     def closeEvent(self, event):
         # TODO(13): 安全关闭
         #   如果线程在运行：stop_reading → quit → wait
         #   停止 refresh timer
-        ???
-
+        if self._thread.isRunning():
+            self._reader.stop_reading()
+            self._thread.quit()
+            self._thread.wait()
+        self._refresh_timer.stop()
+        event.accept()
+    
+    def _flush_buffer(self):
+        if not self._data_buffer:
+            return
+        for data in self._data_buffer:
+            row = self._tableWidget.rowCount()
+            self._tableWidget.insertRow(row)
+            self._tableWidget.setItem(row,0,QTableWidgetItem(f"{data['timestamp']:.2f}"))
+            self._tableWidget.setItem(row,1,QTableWidgetItem(f"{data['temp']}"))
+            self._tableWidget.setItem(row,2,QTableWidgetItem(f"{data['humidity']}"))
+            self._tableWidget.setItem(row,3,QTableWidgetItem(f"{data['pressure']}"))
+        self._data_buffer.clear()
+        while self._tableWidget.rowCount()> 100:
+            self._tableWidget.removeRow(0)
+        self._tableWidget.scrollToBottom()
 
 def main():
     app = QApplication(sys.argv)
