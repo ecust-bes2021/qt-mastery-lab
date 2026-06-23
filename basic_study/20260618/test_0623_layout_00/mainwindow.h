@@ -46,6 +46,13 @@ private:
     //   QPushButton *_btnD;            — 按钮 D
     //   QPushButton *_btnOK;           — 确定按钮
     //   QPushButton *_btnCancel;       — 取消按钮
+    QLabel *_labelTitle;
+    QPushButton *_btnA;
+    QPushButton *_btnB;
+    QPushButton *_btnC;
+    QPushButton *_btnD;
+    QPushButton *_btnOK;
+    QPushButton *_btnCancel;
 };
 
 #endif // MAINWINDOW_H

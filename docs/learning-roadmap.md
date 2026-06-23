@@ -29,8 +29,8 @@
 | 1 | QObject 与对象树 | ✅ 完成 | 与 PySide6 对应，关注内存管理差异 |
 | 2 | 信号与槽 | ✅ 完成 | MOC、connect 语法、emit、自定义信号槽、跨对象通信 |
 | 3 | 事件系统 | ✅ 完成 | 三层处理机制（eventFilter/event/xxxEvent）、override、虚函数重写 |
-| 4 | 布局系统 | ⬜ 待定 | 与 PySide6 基本一致 |
-| 5 | 样式与绘制 | ⬜ 待定 | QPainter、QGraphicsView |
+| 4 | 布局系统 | ✅ 完成 | VBox/HBox/Grid、嵌套、stretch、spacing、margins、SizePolicy |
+| 5 | 样式与绘制 | 🔄 进行中 | QSS 已完成，QPainter 待练习 |
 | 6 | Model/View | ⬜ 待定 | 性能优化、自定义 Model |
 | 7 | 多线程 | ⬜ 待定 | QThread、QtConcurrent、线程安全 |
 | 8 | 文件与序列化 | ⬜ 待定 | QDataStream、二进制格式 |
@@ -52,3 +52,4 @@
 | 2026-06-22 | QObject 与对象树完成（对象树、parent-child、内存管理、children 遍历） |
 | 2026-06-22 | 信号与槽完成（自定义信号槽、emit、connect 四参数、跨对象通信、Sensor 练习） |
 | 2026-06-22 | 事件系统完成（三层机制、eventFilter、override、mousePressEvent/keyPressEvent） |
+| 2026-06-23 | 布局系统完成（Grid/HBox/VBox嵌套、stretch、spacing、margins、SizePolicy） |

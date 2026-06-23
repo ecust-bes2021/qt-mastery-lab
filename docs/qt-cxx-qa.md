@@ -428,6 +428,41 @@ const QObjectList &children = widget->children();
 | 想修改但不影响原始的 | 拷贝（不加 `&`） |
 | 想直接修改原始数据 | `&`（非 const 引用） |
 
+**函数参数传递方式的完整选择指南**：
+
+```cpp
+// 1. const & — 只读，不修改，不拷贝（最常用）
+void print(const QString &text);        // 只读取 text
+
+// 2. & — 会修改原对象（或对象禁止拷贝）
+void drawGauge(QPainter &painter);      // 会 setPen/drawLine，修改 painter
+void fill(QVector<int> &data);          // 往 data 里塞数据
+
+// 3. 值传递 — 需要一份副本（小对象或确实需要拷贝）
+void setAge(int age);                   // int 很小，直接拷贝
+void process(QString text);             // 函数内部要改 text 但不影响外面
+
+// 4. 指针 — 参数可能为空（可选参数）
+void setParent(QObject *parent);        // parent 可以是 nullptr（表示无父对象）
+void init(Config *cfg = nullptr);       // cfg 可选，不传就用默认配置
+```
+
+**决策流程**：
+
+```
+这个参数可能是 nullptr 吗？
+├── 是 → 用指针 *
+└── 不是 → 继续判断
+    │
+    函数内部会修改这个参数吗？
+    ├── 会修改 → 用 &（非 const 引用）
+    └── 不修改 → 继续判断
+        │
+        对象大吗？（大于 8~16 字节）
+        ├── 大（QString、QVector、自定义类）→ 用 const &
+        └── 小（int、double、bool、指针）→ 直接值传递
+```
+
 ---
 
 ### 9. 深拷贝 vs 浅拷贝
@@ -986,6 +1021,78 @@ bool MainWindow::event(QEvent *event) {
 | 典型场景 | 鼠标拖拽、快捷键、窗口关闭确认 | 按钮点击、数据更新通知 |
 
 **关系**：信号往往是事件的"上层包装"。例如 QPushButton 的 `clicked()` 信号，底层就是 `mousePressEvent` + `mouseReleaseEvent` 组合触发的。
+
+---
+
+### 33. QSS 样式表
+
+QSS（Qt Style Sheets）语法类似 CSS，用于快速设置控件外观。
+
+**三种使用方式**：
+
+```cpp
+// 方式1：给单个控件设样式
+btn->setStyleSheet("background: #3498db; color: white; border-radius: 5px;");
+
+// 方式2：给整个窗口设样式（所有子控件生效）
+this->setStyleSheet("QPushButton { background: #3498db; color: white; }"
+                    "QLabel { font-size: 14px; }");
+
+// 方式3：从文件加载（大项目推荐）
+QFile file(":/style.qss");
+file.open(QFile::ReadOnly);
+qApp->setStyleSheet(file.readAll());
+```
+
+**选择器**：
+
+```css
+QPushButton { }              /* 所有 QPushButton */
+QPushButton#btnOK { }        /* objectName 为 btnOK 的按钮 */
+QPushButton:hover { }        /* 鼠标悬停状态 */
+QPushButton:pressed { }      /* 按下状态 */
+QPushButton:disabled { }     /* 禁用状态 */
+```
+
+**常用属性**：
+
+```css
+background: #222;            /* 背景色 */
+color: #fff;                 /* 文字颜色 */
+font-size: 16px;             /* 字体大小 */
+font-weight: bold;           /* 加粗 */
+border: 2px solid #ccc;      /* 边框 */
+border-radius: 8px;          /* 圆角 */
+padding: 5px 10px;           /* 内边距 */
+min-height: 40px;            /* 最小高度 */
+```
+
+**伪状态（交互反馈）**：
+
+```cpp
+btn->setStyleSheet(
+    "QPushButton {"
+    "  background: #3498db; color: white; border-radius: 5px; padding: 8px;"
+    "}"
+    "QPushButton:hover {"
+    "  background: #2980b9;"
+    "}"
+    "QPushButton:pressed {"
+    "  background: #1abc9c;"
+    "}"
+);
+```
+
+**QSS vs C++ API**：
+
+| | QSS | C++ API |
+|--|-----|---------|
+| 颜色 | `background: red;` | `setPalette(...)` 繁琐 |
+| 字体 | `font-size: 16px;` | `setFont(QFont("", 16))` |
+| 圆角 | `border-radius: 5px;` | 只能靠 QPainter 自绘 |
+| 适用场景 | 快速调外观 | 精确控制每一个像素 |
+
+**原则**：改外观用 QSS 最快，自绘复杂图形用 QPainter。
 
 ---
 
