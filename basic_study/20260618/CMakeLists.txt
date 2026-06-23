@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.16)
+project(qt_practice LANGUAGES CXX)
+
+add_subdirectory(test_0617_object_00)
+add_subdirectory(test_0622_slot_00)
+add_subdirectory(test_0622_event_00)
+add_subdirectory(test_0623_layout_00)

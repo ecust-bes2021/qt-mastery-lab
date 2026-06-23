@@ -26,9 +26,9 @@
 
 | # | 主题 | 状态 | 备注 |
 |---|------|------|------|
-| 1 | QObject 与对象树 | 🔄 进行中 | 与 PySide6 对应，关注内存管理差异 |
-| 2 | 信号与槽 | ⬜ 待定 | MOC、connect 语法（新旧）、类型安全 |
-| 3 | 事件系统 | ⬜ 待定 | 事件循环、事件过滤器 |
+| 1 | QObject 与对象树 | ✅ 完成 | 与 PySide6 对应，关注内存管理差异 |
+| 2 | 信号与槽 | ✅ 完成 | MOC、connect 语法、emit、自定义信号槽、跨对象通信 |
+| 3 | 事件系统 | ✅ 完成 | 三层处理机制（eventFilter/event/xxxEvent）、override、虚函数重写 |
 | 4 | 布局系统 | ⬜ 待定 | 与 PySide6 基本一致 |
 | 5 | 样式与绘制 | ⬜ 待定 | QPainter、QGraphicsView |
 | 6 | Model/View | ⬜ 待定 | 性能优化、自定义 Model |
@@ -49,3 +49,6 @@
 | 2026-06-09 | QObject 与对象树 开始 |
 | 2026-06-16 | 多线程 阶段①~③ 全部完成（QThread+Worker、QMutex线程安全、串口模拟实战） |
 | 2026-06-16 | PySide6 核心部分暂停，转入 Qt6 C++ 学习 |
+| 2026-06-22 | QObject 与对象树完成（对象树、parent-child、内存管理、children 遍历） |
+| 2026-06-22 | 信号与槽完成（自定义信号槽、emit、connect 四参数、跨对象通信、Sensor 练习） |
+| 2026-06-22 | 事件系统完成（三层机制、eventFilter、override、mousePressEvent/keyPressEvent） |
