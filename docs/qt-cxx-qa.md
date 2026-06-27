@@ -366,6 +366,43 @@ op = [](int a, int b) { return a * b; };   // 也能存 lambda
 | 含义 | 返回一个地址 | 存一个函数的地址 |
 | 用途 | 创建堆对象、工厂模式 | 回调、策略模式、Qt connect |
 
+### 4.5 成员函数名不会自动退化为指针
+
+**普通函数**：函数名自动退化为函数指针（C 延续下来的规则）
+
+```cpp
+void freeFunc() { ... }
+
+void (*p)() = freeFunc;    // ✅ 不加 & 也行，自动退化
+void (*p)() = &freeFunc;   // ✅ 加 & 也行，等价
+```
+
+**成员函数**：必须显式用 `&` 取地址，不会自动退化
+
+```cpp
+class Widget {
+    void onStart();
+};
+
+void (Widget::*p)() = &Widget::onStart;   // ✅ 必须写 &类名::函数名
+void (Widget::*p)() = Widget::onStart;    // ❌ 编译错误
+void (Widget::*p)() = onStart;            // ❌ 编译错误
+```
+
+**原因**：成员函数需要对象（隐含 this）才能调用，它的地址类型是 `void (Widget::*)()`，比普通函数指针复杂。C++ 标准规定不允许隐式转换，强制开发者明确写出归属。
+
+**Qt connect 中的体现**：
+
+```cpp
+connect(_btnStart, &QPushButton::clicked, this, &Widget::onStart);
+//                 ↑ 必须 & + 类名::信号            ↑ 必须 & + 类名::槽
+```
+
+| 函数类型 | 取地址方式 | 原因 |
+|----------|-----------|------|
+| 普通函数 | `funcName` 或 `&funcName` | 自动退化 |
+| 成员函数 | 必须 `&ClassName::funcName` | C++ 语法强制 |
+
 ---
 
 ### 5. `const`
@@ -599,6 +636,33 @@ class MainWindow : public QMainWindow {
 private:
     Ui::MainWindow *ui;   // 只用指针，不需要知道类的大小
 };
+```
+
+**使用规则**：在 .h 中只用了指针或引用时，前向声明够了；在 .cpp 中需要调用方法时才 #include。
+
+| .h 中的使用方式 | 需要 #include？ | 前向声明够？ |
+|----------------|:-:|:-:|
+| `Worker *_worker;`（指针成员） | | ✅ |
+| `void func(Worker &w);`（引用参数） | | ✅ |
+| `Worker _worker;`（值成员） | ✅ | |
+| `_worker->doWork();`（调用方法） | ✅ | |
+| `class X : public Worker`（继承） | ✅ | |
+
+**好处**：减少头文件间的依赖链，加快编译速度。A.h 改了不会导致所有 include A.h 的文件都重新编译。
+
+**典型模式**：
+
+```cpp
+// widget.h
+class Worker;              // 前向声明（.h 中只用指针）
+
+class Widget : public QWidget {
+    Worker *_worker;       // ✅ 指针，前向声明够了
+};
+
+// widget.cpp
+#include "worker.h"        // .cpp 中要调用方法，必须 include
+_worker->doWork();         // ✅ 编译器需要知道 Worker 的完整定义
 ```
 
 ---
@@ -1093,6 +1157,524 @@ btn->setStyleSheet(
 | 适用场景 | 快速调外观 | 精确控制每一个像素 |
 
 **原则**：改外观用 QSS 最快，自绘复杂图形用 QPainter。
+
+### 34. `Qt::` 命名空间与枚举
+
+**`Qt::` 是什么**：
+
+Qt 框架将大量枚举常量集中放在 `Qt` 命名空间中，用有意义的名字代替魔法数字。
+
+**常见分类**：
+
+| 类别 | 举例 | 用途 |
+|------|------|------|
+| 数据角色 | `Qt::DisplayRole`, `Qt::EditRole`, `Qt::BackgroundRole` | Model/View 中区分"问什么" |
+| Item 标志 | `Qt::ItemIsEnabled`, `Qt::ItemIsEditable` | 单元格能力 |
+| 方向 | `Qt::Horizontal`, `Qt::Vertical` | 表头方向 |
+| 对齐 | `Qt::AlignCenter`, `Qt::AlignLeft` | 文本对齐 |
+| 颜色 | `Qt::red`, `Qt::blue` | 预定义颜色 |
+| 画笔样式 | `Qt::SolidLine`, `Qt::DashLine` | QPainter 线型 |
+| 键盘键 | `Qt::Key_Escape`, `Qt::Key_Return` | 事件系统按键识别 |
+
+**为什么是 `Qt::ItemIsEnabled` 而不是 `Qt::ItemFlag::ItemIsEnabled`？**
+
+Qt 使用的是传统**无作用域枚举**（`enum`），不是 C++11 的 `enum class`：
+
+```cpp
+// Qt 内部（简化）
+namespace Qt {
+    enum ItemFlag {          // 传统 enum，不是 enum class
+        ItemIsEnabled = 1,
+        ItemIsSelectable = 2,
+        ItemIsEditable = 4,
+    };
+}
+```
+
+传统 `enum` 的枚举值**直接暴露到外层命名空间**，所以只需要 `Qt::ItemIsEnabled`，不需要再经过枚举类型名那一层。
+
+**对比**：
+
+| 枚举类型 | 语法 | 访问方式 |
+|----------|------|----------|
+| `enum ItemFlag { ... }` | 传统（Qt 用这种） | `Qt::ItemIsEnabled` |
+| `enum class ItemFlag { ... }` | C++11 强类型 | `Qt::ItemFlag::ItemIsEnabled` |
+
+Qt 诞生于 C++11 之前，一直沿用传统 enum，改了会破坏所有现有代码的兼容性。
+
+### 35. QAtomicInteger 与内存顺序
+
+**为什么需要原子操作**：
+
+当两个线程读写同一个变量时（比如 UI 线程写停止标志，Worker 线程读标志），普通 `bool` 是数据竞争（未定义行为）。`QAtomicInteger<bool>` 保证读写是原子的（不会读到"写了一半"的值）。
+
+**两组 API**：
+
+| 写 | 读 | 额外保证 |
+|----|----|---------| 
+| `storeRelaxed(value)` | `loadRelaxed()` | 无（只保证原子性） |
+| `storeRelease(value)` | `loadAcquire()` | 对周围普通变量的可见性有保证 |
+
+**Relaxed（只保证原子性）**：
+
+```cpp
+_stopFlag.storeRelaxed(true);   // 原子写：其他线程能读到 true
+_stopFlag.loadRelaxed();         // 原子读：不会读到"写了一半"的值
+```
+
+适用场景：只有一个共享标志位，没有其他需要同步的数据。
+
+**Release/Acquire（保证周围普通变量的可见性）**：
+
+```cpp
+// 线程A（生产者）
+_result = 42;                       // 普通写
+_ready.storeRelease(true);          // 原子写 + 保证 _result=42 对其他线程可见
+
+// 线程B（消费者）
+if (_ready.loadAcquire()) {         // 原子读
+    use(_result);                   // 保证能看到 42（不会看到旧值）
+}
+```
+
+**关键理解**：Release/Acquire 操作的还是同一个原子变量（`_ready`），它本身不"存储其他数据"。它的作用是**充当内存屏障**，保证"Release 之前的所有普通写入"对"Acquire 之后的所有普通读取"可见。
+
+**为什么需要这个保证？**：CPU 为了性能会重排指令。没有屏障时，线程B 可能先读到 `_ready==true`，但 `_result` 还没从线程A 同步过来（看到旧值）。
+
+**选择指南**：
+
+| 场景 | 推荐 |
+|------|------|
+| 单纯的开关标志（如停止标志） | `Relaxed` |
+| 通过标志同步其他数据（如"数据准备好了"） | `Release` + `Acquire` |
+
+### 36. moveToThread 与 parent 的关系
+
+**规则**：`moveToThread` 要求对象**不能有 parent**。
+
+**原因**：Qt 对象树要求 parent 和 child 必须在同一线程。如果 child 有 parent（在主线程），你把 child 移到子线程 → parent-child 跨线程 → parent 析构时跨线程 delete child = 崩溃。
+
+```cpp
+_worker = new Worker(this);      // ❌ 有 parent
+_worker->moveToThread(_thread);  // Qt 报 warning，不生效
+
+_worker = new Worker();          // ✅ 无 parent
+_worker->moveToThread(_thread);  // 正常
+```
+
+**那内存谁管？**：没有 parent 就不在对象树里，不会被自动 delete。用 `deleteLater` 安排清理：
+
+```cpp
+connect(_worker, &Worker::finished, _worker, &Worker::deleteLater);
+```
+
+**为什么构造函数还保留 `parent = nullptr` 参数？**
+
+```cpp
+explicit Worker(QObject *parent = nullptr);
+```
+
+这是 Qt 类的惯例格式，传 `nullptr` 等于没有 parent。保留参数的目的：
+- Qt 代码风格统一（所有 QObject 子类都这么写）
+- 灵活性（万一某些场景不需要 moveToThread，可以直接挂树）
+- Qt Creator 模板自动生成
+
+完全可以写成 `explicit Worker();`，功能一样。
+
+### 37. deleteLater 的执行时机
+
+**是什么**：QObject 提供的函数，作用是"把 delete 操作延迟到事件循环的下一轮执行"。
+
+**为什么不直接 delete**：
+
+```cpp
+emit finished();
+// ← 此刻 Worker 还在执行代码（刚 emit 完，还没从函数返回）
+// 如果这时候 delete Worker → 正在执行的对象被删了 → 崩溃
+```
+
+**deleteLater 的执行流程**：
+
+```
+Worker::doWork() 执行中
+  → emit finished()
+  → 触发 deleteLater()（注册"待删除"事件到事件队列）
+  → doWork() 正常 return
+  → 事件循环取下一个事件："删除 Worker"
+  → 此时 Worker 没有代码在跑，安全 delete ✅
+```
+
+**使用场景**：任何"对象正在参与信号槽执行时需要被删除"的情况都用 `deleteLater`，不要直接 `delete`。
+
+---
+
+### 38. Qt Plugin 系统
+
+**是什么**：Qt 提供的动态库加载机制，让主程序在运行时加载 `.dll`（或 `.so`），获得新功能，而不需要重新编译主程序。
+
+**核心设计思想**：接口与实现分离。
+
+```
+主程序（Host）
+  │ 只知道接口（纯虚类），不知道具体实现
+  │ 运行时通过 QPluginLoader 加载 .dll
+  ▼
+Plugin（.dll）
+  实现了接口的所有纯虚函数
+  通过 Q_INTERFACES + Q_PLUGIN_METADATA 注册
+```
+
+**三个关键角色**：
+
+| 角色 | 职责 | 代码所在 |
+|------|------|---------|
+| 接口（Interface） | 纯虚类，定义"能做什么" | 独立头文件，主程序和 Plugin 都 include |
+| Plugin 实现 | 继承 QObject + 接口，真正做事 | 编译为 .dll |
+| 主程序加载 | QPluginLoader 加载 .dll，qobject_cast 转为接口指针 | 主程序 |
+
+**代码骨架**：
+
+```cpp
+// ① 接口定义（纯虚类）
+class MyPluginInterface
+{
+public:
+    virtual ~MyPluginInterface() {}
+    virtual QString name() const = 0;
+    virtual QWidget* createWidget(QWidget *parent) = 0;
+};
+Q_DECLARE_INTERFACE(MyPluginInterface, "com.example.MyPluginInterface/1.0")
+
+// ② Plugin 实现（编译为 .dll）
+class LedPlugin : public QObject, public MyPluginInterface
+{
+    Q_OBJECT
+    Q_INTERFACES(MyPluginInterface)
+    Q_PLUGIN_METADATA(IID "com.example.MyPluginInterface/1.0" FILE "ledplugin.json")
+public:
+    QString name() const override { return "LedIndicator"; }
+    QWidget* createWidget(QWidget *parent) override {
+        return new LedIndicator(parent);
+    }
+};
+
+// ③ 主程序加载
+QPluginLoader loader("plugins/ledplugin.dll");
+QObject *obj = loader.instance();
+MyPluginInterface *plugin = qobject_cast<MyPluginInterface*>(obj);
+if (plugin) {
+    QWidget *led = plugin->createWidget(this);
+}
+```
+
+**关键要点**：
+- `Q_PLUGIN_METADATA` 必须带一个 `.json` 文件（哪怕是空的 `{}`），Qt 用它做元数据
+- IID 字符串带版本号（如 `/1.0`），接口变了改版本号，旧 Plugin 不会误加载
+- 主程序不需要 `#include` Plugin 的头文件，只需要接口头文件
+
+**适用场景**：
+- 多芯片系列的烧录协议（每个芯片一个 Plugin）
+- 多种测试项（每个测试类型一个 Plugin）
+- 主程序框架固定，功能通过 Plugin 热插拔扩展
+
+---
+
+### 39. Qt Designer 集成与自定义控件使用方式
+
+#### 39.1 背景：Qt Designer 是什么
+
+Qt Designer 是一个**独立的 GUI 设计工具**（`designer.exe`），提供可视化拖拽界面设计：
+- 左侧面板：控件列表（QPushButton、QLabel 等）
+- 中间画布：拖拽控件、调整位置
+- 右侧面板：属性编辑器
+- 保存结果：`.ui` 文件（XML 格式），编译时由 UIC 工具转成 C++ 代码
+
+#### 39.2 方式一：Plugin 方式（完整集成）
+
+**目标**：让自定义控件出现在 Designer 左侧面板中，可以拖拽使用，且画布上能**实时预览真实外观**。
+
+**完整流程**：
+
+```
+第 1 步：准备自定义控件源码
+    已有 ledindicator.h / ledindicator.cpp（正常的自定义控件）
+
+第 2 步：创建 Designer Plugin 项目（独立项目）
+    新建项目，包含：
+    ├── 控件源码（ledindicator.h/.cpp，拷贝或引用）
+    ├── Plugin 适配类（ledindicatorplugin.h/.cpp）
+    └── 元数据文件（ledindicatorplugin.json，可以是空的 {}）
+
+第 3 步：编写 Plugin 适配类
+    继承 QObject + QDesignerCustomWidgetInterface
+    实现以下方法告诉 Designer 关于控件的信息：
+      name()         → 控件类名（"LedIndicator"）
+      group()        → 面板分组名（"Custom Widgets"）
+      toolTip()      → 鼠标悬停提示
+      whatsThis()    → 详细说明
+      icon()         → 面板图标
+      isContainer()  → 是否是容器控件（能否往里拖子控件）
+      createWidget() → 创建真实控件实例（Designer 拖到画布时调用）
+      domXml()       → .ui 文件中该控件的默认 XML 描述
+      includeFile()  → UIC 生成代码时需要 include 的头文件路径
+
+第 4 步：CMakeLists.txt 配置
+    编译目标为共享库（add_library SHARED），不是可执行文件
+    链接 Qt6::Widgets + Qt6::Designer
+
+第 5 步：编译
+    得到 ledindicatorplugin.dll
+
+第 6 步：部署
+    将 dll 放到 Qt 安装目录/plugins/designer/ 下
+    或设置环境变量 QT_PLUGIN_PATH 指向自定义目录
+
+第 7 步：验证
+    启动 designer.exe → 左侧面板出现 "Custom Widgets" 分组
+    拖拽 LedIndicator 到画布 → 能看到真实的 LED 灯外观
+    保存 → 生成 .ui 文件
+
+第 8 步：在项目中使用 .ui 文件
+    UIC 工具读取 .ui → 生成 ui_xxx.h
+    生成的代码会 #include "ledindicator.h" 并 new LedIndicator(parent)
+    你的项目 CMakeLists.txt 中需要包含 ledindicator.h/.cpp 源码
+    注意：最终 exe 运行时不需要 plugin dll（控件代码已编译进 exe）
+```
+
+**关键理解**：Designer 是已编译好的 exe，它不能编译你的源码。所以需要 Plugin dll 让它在运行时能创建你的控件实例来预览。但你自己的项目编译时是直接编译源码的，不需要这个 dll。
+
+---
+
+#### 39.3 方式二：提升控件（Promoted Widget，轻量级）
+
+**目标**：在 Designer 的 `.ui` 文件中使用自定义控件，但**不需要编写 Plugin、不需要编译 dll**。
+
+**代价**：Designer 画布上只能看到一个占位方块，无法预览真实外观。编译运行后外观正确。
+
+**完整流程**：
+
+```
+第 1 步：在 Designer 中拖一个基类控件到画布
+    例如拖一个 QWidget（因为 LedIndicator 继承自 QWidget）
+
+第 2 步：右键该控件 → "提升为..."（Promote to...）
+
+第 3 步：在弹出对话框中填写
+    提升的类名：LedIndicator
+    头文件：    ledindicator.h
+    基类：      QWidget（自动识别）
+
+第 4 步：点击"添加" → "提升" → 确认
+
+第 5 步：保存 .ui 文件
+    .ui 中会记录：
+      <widget class="LedIndicator" ...>
+      <customwidgets>
+        <customwidget>
+          <class>LedIndicator</class>
+          <extends>QWidget</extends>
+          <header>ledindicator.h</header>
+        </customwidget>
+      </customwidgets>
+
+第 6 步：编译你的项目
+    UIC 读取 .ui → 生成代码 #include "ledindicator.h" + new LedIndicator(parent)
+    你的 CMakeLists.txt 中包含 ledindicator.h/.cpp 源码即可
+    运行后外观完全正确
+```
+
+**优势**：零额外工作量，只需要在 Designer 中右键操作两下。
+**劣势**：设计时看不到真实外观，只能看到基类（QWidget）的空白方块。
+
+---
+
+#### 39.4 方式三：纯代码布局（不用 Designer）
+
+**目标**：完全不用 `.ui` 文件，直接在代码中创建控件和布局。
+
+**做法**：就是我们一直在做的方式：
+
+```
+在构造函数中：
+  _led = new LedIndicator(this);
+  _led->setLabel("电源");
+  auto *layout = new QVBoxLayout(this);
+  layout->addWidget(_led);
+```
+
+不需要 Designer，不需要 .ui 文件，不需要 Plugin，不需要 UIC。
+
+---
+
+#### 39.5 三种方式对比总结
+
+| 维度 | Plugin 集成 | 提升控件（Promoted） | 纯代码布局 |
+|------|-------------|---------------------|-----------|
+| 需要写 Plugin 类 | ✅ 需要 | ❌ 不需要 | ❌ 不需要 |
+| 需要编译 dll | ✅ 需要 | ❌ 不需要 | ❌ 不需要 |
+| Designer 中能预览真实外观 | ✅ 能 | ❌ 只有占位框 | — 不使用 Designer |
+| 使用 .ui 文件 | ✅ | ✅ | ❌ |
+| 开发效率 | 低（前期投入大） | 中（右键提升即可） | 高（直接写代码） |
+| 适合动态布局 | ❌ | ❌ | ✅ |
+| 灵活性 | 低 | 中 | 高 |
+| Git 友好度 | — | 差（.ui 是 XML，diff 难看） | 好（纯代码，diff 清晰） |
+
+#### 39.6 使用时机建议
+
+| 你的场景 | 推荐方式 |
+|---------|---------|
+| 一个人开发工具 | **纯代码布局** |
+| 用 Designer 设计界面 + 自定义控件 | **提升控件** |
+| 做控件库给团队/客户用 | **Plugin 集成** |
+| UI 设计师（不写代码）需要用你的控件 | **Plugin 集成** |
+| 控件还在频繁迭代中 | **纯代码布局**或**提升控件** |
+| 控件已稳定 + 大量项目复用 | **Plugin 集成** |
+
+---
+
+### 40. pybind11（Python 调用 C++ 的主流方案）
+
+**是什么**：一个 C++ 头文件库（header-only），让你用 C++ 编写 Python 扩展模块。编译后生成 `.pyd`（Windows）或 `.so`（Linux），Python 端直接 `import` 使用。
+
+**核心优势**：
+- 能绑定 C++ 类（不仅限于 C 函数）
+- 自动类型转换（Python list ↔ std::vector, str ↔ std::string 等）
+- 自动生命周期管理（Python GC 回收时自动 delete C++ 对象）
+- 语法简洁，绑定代码量少
+
+**完整流程**：
+
+```
+开发阶段：
+  1. 写纯 C++ 代码（业务逻辑，和 Python 无关）
+  2. 写 bindings.cpp（绑定代码，告诉 pybind11 暴露哪些类/方法）
+  3. 写 setup.py + pyproject.toml（构建配置）
+
+编译阶段（uv pip install .）：
+  1. setuptools 读取 setup.py，找到要编译的 .cpp 文件
+  2. 调用 C++ 编译器（MSVC/GCC）编译 .cpp → .obj
+  3. 链接 .obj + python3xx.lib → 生成 crc_module.pyd
+  4. 安装到虚拟环境的 site-packages 中
+
+运行阶段（import crc_module）：
+  1. Python 加载 .pyd 动态库
+  2. pybind11 注册的类/函数出现在 Python 命名空间中
+  3. Python 调用方法 → pybind11 转换参数类型 → 调用 C++ 方法
+  4. C++ 返回值 → pybind11 转换回 Python 类型 → 返回给 Python
+  5. Python 对象被 GC 回收时 → pybind11 自动 delete C++ 对象
+```
+
+**绑定代码核心语法**：
+
+| 语法 | 作用 |
+|------|------|
+| `PYBIND11_MODULE(模块名, m)` | 定义 Python 模块入口 |
+| `py::class_<C++类>(m, "Python类名")` | 注册 C++ 类 |
+| `.def(py::init<参数类型>())` | 绑定构造函数 |
+| `.def("方法名", &类::方法)` | 绑定成员方法 |
+| `.def_property_readonly("名", &getter)` | 绑定只读属性 |
+| `m.def("函数名", &函数)` | 绑定独立函数 |
+| `py::arg("参数名") = 默认值` | 指定参数名和默认值 |
+
+**自动类型转换表**（需要 `#include <pybind11/stl.h>`）：
+
+| Python | C++ | 方向 |
+|--------|-----|------|
+| `str` | `std::string` | 双向 |
+| `int` | `int / uint8_t / uint16_t / ...` | 双向 |
+| `float` | `double / float` | 双向 |
+| `bool` | `bool` | 双向 |
+| `list` | `std::vector` | 双向 |
+| `dict` | `std::map / std::unordered_map` | 双向 |
+| `None` | `void`（返回值） | C++ → Python |
+
+**项目结构**：
+
+| 文件 | 职责 |
+|------|------|
+| `xxx.h / xxx.cpp` | 纯 C++ 业务代码（不依赖 pybind11） |
+| `bindings.cpp` | 绑定代码（桥梁/翻译官） |
+| `setup.py` | 构建配置（告诉编译器怎么编译） |
+| `pyproject.toml` | 项目元信息 + 构建系统声明 |
+
+**适用场景**：
+- 你自己写的 C++ 代码，想暴露给 Python 使用
+- 需要绑定 C++ 类、复杂数据结构
+- 性能热点代码（大文件解析、CRC 计算、协议解析等）
+
+**MSVC 注意事项**：MSVC 默认使用 GBK 代码页，C++ 源文件中的中文字符串会导致编译错误。解决方案：
+- 传给 pybind11 的 docstring 使用英文
+- 在 setup.py 中添加 `/utf-8` 编译选项
+
+---
+
+### 41. ctypes（Python 调用 C 动态库）
+
+**是什么**：Python 标准库自带的模块，可以直接加载 `.dll`（或 `.so`）并调用里面的 C 函数。不需要安装任何额外库。
+
+**工作原理**：
+
+```
+已有的 C 动态库（mylib.dll）
+        ↓
+Python: ctypes.CDLL("mylib.dll")
+        ↓
+手动声明参数类型和返回类型
+        ↓
+调用函数
+```
+
+**使用示例**：
+
+```python
+import ctypes
+
+lib = ctypes.CDLL("./mylib.dll")
+
+# 必须手动声明参数类型和返回类型
+lib.add.argtypes = [ctypes.c_int, ctypes.c_int]
+lib.add.restype = ctypes.c_int
+
+result = lib.add(3, 5)  # 调用 C 的 int add(int a, int b)
+```
+
+**关键限制**：
+- 只能调**纯 C 函数**（C 的 ABI 是稳定的，C++ 的不是）
+- C++ 类、模板、重载函数 → 不能直接调，必须先包一层 `extern "C"` 接口
+- 所有参数类型、返回类型必须手动声明（Python 不知道 dll 的函数签名）
+- 内存管理完全手动（容易泄漏或崩溃）
+- 不支持自动类型转换（vector、string 等需要手动处理）
+
+**适用场景**：
+- 调用**已有的 C 动态库**（芯片厂商提供的 SDK .dll、系统 API 等）
+- 你**没有源码**，只有一个 .dll 文件
+- 接口简单、函数少
+
+---
+
+### 42. pybind11 vs ctypes 对比
+
+| 维度 | pybind11 | ctypes |
+|------|----------|--------|
+| 能调 C 函数 | ✅ | ✅ |
+| 能调 C++ 类 | ✅ 直接支持 | ❌ 需要包 C 接口 |
+| 类型自动转换 | ✅ | ❌ 全部手动 |
+| 内存管理 | ✅ 自动（GC 联动） | ❌ 手动 delete |
+| 错误处理 | ✅ C++ 异常 → Python 异常 | ❌ 段错误直接 crash |
+| 需要源码 | ✅ 需要 | ❌ 不需要 |
+| 需要编译 | ✅ 编译成 .pyd | ❌ 直接加载 .dll |
+| 安装依赖 | pip install pybind11 | 无（标准库） |
+| Python 端体验 | 像原生 Python 类 | 像调外部函数 |
+
+**选择建议**：
+
+| 场景 | 用什么 |
+|------|--------|
+| 你能控制 C++ 源码 | **pybind11** |
+| 只有 .dll 没有源码 | **ctypes** |
+| 绑定 C++ 类 | **pybind11** |
+| 调芯片厂商 SDK | **ctypes**（通常只有 .dll） |
+| 追求 Python 端使用体验 | **pybind11** |
 
 ---
 

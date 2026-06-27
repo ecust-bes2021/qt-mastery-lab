@@ -1,0 +1,10 @@
+README.md
+bindings.cpp
+crc_calculator.cpp
+pyproject.toml
+setup.py
+test_0626_pybind_00.egg-info/PKG-INFO
+test_0626_pybind_00.egg-info/SOURCES.txt
+test_0626_pybind_00.egg-info/dependency_links.txt
+test_0626_pybind_00.egg-info/requires.txt
+test_0626_pybind_00.egg-info/top_level.txt

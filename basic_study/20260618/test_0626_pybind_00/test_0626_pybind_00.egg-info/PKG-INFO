@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: test-0626-pybind-00
+Version: 0.1.0
+Summary: pybind11 demo - CRC Calculator
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: pybind11>=3.0.4

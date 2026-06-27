@@ -1,0 +1,16 @@
+[project]
+name = "test-0626-pybind-00"
+version = "0.1.0"
+description = "pybind11 demo - CRC Calculator"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pybind11>=3.0.4",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "pybind11>=2.11"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = []
